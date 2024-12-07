@@ -1,0 +1,776 @@
+#!/usr/bin/env zsh
+
+# Author: John Hale
+# Date: Nov 24,2024
+#
+# NOTE:
+# ── Watch for Duplicates from the other config files. ─────────────────
+# - Look In Here
+# /usr/share/zsh/
+# /usr/share/oh-my-zsh/custom/
+#
+# Made a few wallust aliases - waltest - walest -
+# - nvim-logo -l = Made an alias to nvimlogo
+#
+# - I installed batman for better colors and support
+# OUT - made fman from fzf-man
+# - removed manf - commented out - manf = dead now - is a script in local bin
+
+#
+#FIX: Make a functions-file.zsh - aliases - settings - and put them in the /usr/oh-my-zsh/custom folder.
+# - I think anything that I make and put into the ZSH Custom folder will override the aliases made by the apps.
+# - Make some awesome EZA commands #
+#
+# ── * Package Finder Packages ─────────────────────────────────────────
+# - fzpac = Uses Paru by default
+# - fpf = Use -a for AUR files
+#
+
+#          ╭──────────────────────────────────────────────────────────╮
+#          │      A few things I want to be at the top of file.       │
+#          ╰──────────────────────────────────────────────────────────╯
+#
+### This should probably be at the bottom of the file? - Inside OG @ the bottom
+# ── To customize prompt, run `p10k configure` or edit ~/.p10k.zsh. ────
+# [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
+
+#
+#
+# nvimlogo -l
+alias nvimlogo='nvim-logo -o'
+#
+#
+# Glances
+alias glances='glances --fahrenheit'
+#
+# alias v="nvim"
+# alias vi="nvim"
+alias vim="nvim"
+# Is this the best way to do this ???
+alias snvim='sudo nvim'
+
+alias info='info --vi-keys'
+
+# export EDITOR="nvim"
+
+export EDITOR='nvim'
+export VISUAL='nvim'
+#
+# From FZF
+eval "$(fzf --zsh)"
+#
+# Getting folding to work here. z - option
+# Visual select mode. z f Enter = Create fold
+#
+#
+# All of these functions can be made into their own file and then sourced to here.
+#
+#          ╭──────────────────────────────────────────────────────────╮
+#          │     get JSON response from route and make it pretty      │
+#          ╰──────────────────────────────────────────────────────────╯
+sjq() {
+    curl -s $1 | jq
+}
+
+# ── changing dirs conditionally ───────────────────────────────────────
+#          ╭──────────────────────────────────────────────────────────╮
+#          │     cdf - cd into the directory of the selected file     │
+#          ╰──────────────────────────────────────────────────────────╯
+cdf() {
+    local file
+    local dir
+    file=$(fzf +m -q "$1") && dir=$(dirname "$file") && cd "$dir"
+}
+
+#          ╭──────────────────────────────────────────────────────────╮
+#          │    cdg - find all git repos, select one and CD to its    │
+#          │                        parent dir                        │
+#          ╰──────────────────────────────────────────────────────────╯
+#
+cdg() {
+    local file
+    local dir
+    file=$(fd -H -g .git | fzf) && dir=$(dirname "$file") && cd "$dir"
+}
+
+#          ╭──────────────────────────────────────────────────────────╮
+#          │    look up Git worktrees and CD to selected! This was    │
+#          │                  the best idea ever -                   │
+#          ╰──────────────────────────────────────────────────────────╯
+td() {
+    local wtdir
+    wtdir=$(git worktree list | fzf | awk '{print $1}')
+    if [[ -n $wtdir ]]; then
+        cd "$wtdir"
+    fi
+}
+
+#     ╭────────────────────────────────────────────────────────────────────╮
+#     │https://github.com/jesseduffield/lazygit#changing-directory-on-exit │
+#     ╰────────────────────────────────────────────────────────────────────╯
+lg()
+{
+    export LAZYGIT_NEW_DIR_FILE=~/.lazygit/newdir
+
+    lazygit "$@"
+
+    if [ -f $LAZYGIT_NEW_DIR_FILE ]; then
+        cd "$(cat $LAZYGIT_NEW_DIR_FILE)"
+        rm -f $LAZYGIT_NEW_DIR_FILE > /dev/null
+    fi
+}
+
+#          ╭──────────────────────────────────────────────────────────╮
+#          │              for `vg` grep- find-in-file(s)              │
+#          ╰──────────────────────────────────────────────────────────╯
+fif() {
+    if [ ! "$#" -gt 0 ]; then echo "Need a string to search for!"; return 1; fi
+    rg --ignore-case --files-with-matches --no-messages "$1" | fzf --preview "highlight -O ansi -l {} 2> /dev/null | rg --colors 'match:bg:yellow' --ignore-case --pretty --context 6 '$1' || rg --ignore-case --pretty --context 6 '$1' {}" --preview-window=right:60% --multi --select-1 --exit-0
+}
+
+#          ╭──────────────────────────────────────────────────────────╮
+#          │           search for local Vim help using fvh            │
+#          ╰──────────────────────────────────────────────────────────╯
+vh() {
+    local file
+    file=$(fvh $1)
+    if [[ -n $file ]]
+    then
+        nvim $file -c /$1 -c 'norm! n zz'
+    fi
+}
+
+# ── find in files - open in Vim - go to 1st search result ─────────────
+#          ╭──────────────────────────────────────────────────────────╮
+#          │            vim - grep - takes a query to grep            │
+#          ╰──────────────────────────────────────────────────────────╯
+vg() {
+    local file
+    file=$(fif $1)
+    if [[ -n $file ]]
+    then
+        nvim $file -c /$1 -c 'norm! n zz'
+    fi
+}
+
+#          ╭──────────────────────────────────────────────────────────╮
+#          │    find a file and open it fzf → fd → Vim -- no args,    │
+#          │            looks in cwd - rg to highlight etc            │
+#          ╰──────────────────────────────────────────────────────────╯
+vf() {
+    IFS=$'\n' files=($(fzf --preview "highlight -O ansi -l {} 2> /dev/null | rg --colors 'match:bg:yellow' --ignore-case --pretty --context 6 '$1' || rg --ignore-case --pretty --context 6 '$1' {}" --preview-window=right:60%  --query="$1" --multi --select-1 --exit-0))
+    [[ -n "$files" ]] && ${EDITOR:-nvim} "${files[@]}"
+}
+
+#          ╭──────────────────────────────────────────────────────────╮
+#          │             search notes and open it in nvim             │
+#          ╰──────────────────────────────────────────────────────────╯
+vn() {
+    local note
+    note=$(fd . "$HOME/notes" | fzf)
+    if [[ -n $note ]]
+    then
+        nvim $note
+    fi
+}
+
+#          ╭──────────────────────────────────────────────────────────╮
+#          │        todoist cli - list todos then show detail         │
+#          ╰──────────────────────────────────────────────────────────╯
+# ── https://github.com/sachaos/todoist#keybind ────────────────────────
+# todos() {
+#     local todo
+#     todo=$(todoist list | fzf | awk '{print $1}')
+#     if [[ -n $todo ]]
+#     then
+#         todoist show $todo
+#     fi
+# }
+
+#          ╭──────────────────────────────────────────────────────────╮
+#          │               find rust crate and install                │
+#          ╰──────────────────────────────────────────────────────────╯
+rc() {
+    local crate
+    crate=$(cargo search $1 | fzf | awk '{print $1}')
+    cargo install $crate
+}
+
+#          ╭──────────────────────────────────────────────────────────╮
+#          │          find word by partial string and pbcopy          │
+#          ╰──────────────────────────────────────────────────────────╯
+word() {
+    rg $1 /usr/share/dict/words | fzf | xclip
+}
+
+#          ╭──────────────────────────────────────────────────────────╮
+#          │fkill - kill processes - list only the ones you can kill. │
+#          ╰──────────────────────────────────────────────────────────╯
+fzfkill() {
+    local pid
+    if [ "$UID" != "0" ]; then
+        pid=$(ps -f -u $UID | sed 1d | fzf -m | awk '{print $2}')
+    else
+        pid=$(ps -ef | sed 1d | fzf -m | awk '{print $2}')
+    fi
+
+    if [ "x$pid" != "x" ]
+    then
+        echo $pid | xargs kill -${1:-9}
+    fi
+}
+
+#          ╭──────────────────────────────────────────────────────────╮
+#          │                         LazyGit                          │
+#          ╰──────────────────────────────────────────────────────────╯
+
+# lgit() {
+#     local dir
+#     dir=$(find ~/Desktop -maxdepth 4 -type d ! -path "**/node_modules/*" | fzf -m)
+#     cd $dir
+#     lazygit
+#     cd
+# }
+
+#
+#          ╭──────────────────────────────────────────────────────────╮
+#          │    Man without options will use fzf to select a page     │
+#          ╰──────────────────────────────────────────────────────────╯
+fzf-man() {
+MAN="/usr/bin/man"
+if [ -n "$1" ]; then
+    $MAN "$@"
+    return $?
+else
+    batman="man {1} | col -bx | bat --language=man --plain --color always --theme=\"Monokai Extended\""
+    $MAN -k . | fzf --reverse --preview="$batman" | awk '{print $1 "." $2}' | tr -d '()' | xargs -r $MAN
+    return $?
+fi
+}
+#
+# ---------------------------------------------------------------------------------
+# This works OK but No color and I already have the fzf-man command from above
+#manf() {
+#    man -k . | fzf -q "$1" --prompt='man> '  --preview $'echo {} | tr -d \'()\' | awk \'{printf "%s ", $2} {print $1}\' | xargs -r man' | tr -d '()' | awk '{printf "%s ", $2} {print $1}' | xargs -r man
+#}
+
+#          ╭──────────────────────────────────────────────────────────╮
+#          │           Eval commands on the fly within fzf            │
+#          ╰──────────────────────────────────────────────────────────╯
+fzf-eval(){
+echo | fzf -q "$*" --preview-window=up:99% --preview="eval {q}"
+}
+
+# ── Search list of your aliases and functions ─────────────────────────
+fzf-aliases-functions() {
+CMD=$(
+(
+(alias)
+(functions | grep "()" | cut -d ' ' -f1 | grep -v "^_" )
+) | fzf | cut -d '=' -f1
+);
+
+eval $CMD
+}
+alias faf='fzf-aliases-functions'
+
+
+# ── Search Environment Variables ──────────────────────────────────────
+fzf-env-vars() {
+local out
+out=$(env | fzf)
+echo $(echo $out | cut -d= -f2)
+}
+
+# ── kill process ──────────────────────────────────────────────────────
+fzf-kill-processes() {
+local pid
+pid=$(ps -ef | sed 1d | fzf -m | awk '{print $2}')
+
+if [ "x$pid" != "x" ]
+then
+    echo $pid | xargs kill -${1:-9}
+fi
+}
+
+# ── Delete multiple files with FZF ────────────────────────────────────
+rmf() {
+    ls | fzf -m | xargs -I {} rm {}
+}
+#
+#
+# fzf_git_add() {
+#     local selections=$(
+#       git status --porcelain | \
+#       fzf --ansi \
+#           --preview 'if (git ls-files --error-unmatch {2} &>/dev/null); then
+#                          git diff --color=always {2}
+#                      else
+#                          bat --color=always --line-range :500 {2}
+#                      fi'
+#       )
+#     if [[ -n $selections ]]; then
+#         git add --verbose $(echo "$selections" | cut -c 4- | tr '\n' ' ')
+#     fi
+# }
+
+# alias fzf-gadd='fzf_git_add'
+
+# ── FZF cd ────────────────────────────────────────────────────────────
+fzf_change_directory() {
+    local directory=$(
+      fd --type d | \
+      fzf --query="$1" --no-multi --select-1 --exit-0 \
+          --preview 'tree -C {} | head -100'
+      )
+    if [[ -n $directory ]]; then
+        cd "$directory"
+    fi
+}
+
+alias fzfcd='fzf_change_directory'
+
+# ── fzf find nvim edit ────────────────────────────────────────────────
+fzf_find_edit() {
+    local file=$(
+      fzf --query="$1" --no-multi --select-1 --exit-0 \
+          --preview 'bat --color=always --line-range :500 {}'
+      )
+    if [[ -n $file ]]; then
+        $EDITOR "$file"
+    fi
+}
+
+alias fzfE='fzf_find_edit'
+
+# ----------------------------------------------------------------------
+#          ╭──────────────────────────────────────────────────────────╮
+#          │        Found a few cool things from the Internets        │
+#          ╰──────────────────────────────────────────────────────────╯
+
+open-line() {
+    vi $(rg --hidden --line-number . | fzf --delimiter ':' --preview 'bat --color=always --highlight-line {2} {1}' | awk -F ':' '{print "+"$2" "$1}')
+}
+
+timezsh() {
+    shell=${1-$SHELL}
+    for i in $(seq 1 10); do /usr/bin/time $shell -i -c exit; done
+}
+
+killport() {
+    PID=$(sudo lsof -t -i:$1)
+    sudo kill -9 ${PID}
+}
+#
+# ----------------------------------------------------------------------
+#          +----------------------------------------------------------+
+#          |                **** vi-mode options ****                 |
+#          +----------------------------------------------------------+
+# ── LOOK HERE:  .oh-my-zsh/plugins/* ──────────────────────────────────
+#
+VI_MODE_RESET_PROMPT_ON_MODE_CHANGE=true
+
+# This messes up the cursor when ON
+# VI_MODE_SET_CURSOR=true
+#
+# $KEYTIMEOUT  might be set too fast. needs a longer delay before the second key press.
+#
+#
+#
+#          ╭──────────────────────────────────────────────────────────╮
+#          │                       FZF COLORS                         │
+#          ╰──────────────────────────────────────────────────────────╯
+# ── NOTE: fzf colors can also be defined inside of scripts ────────────
+
+# cobalt2
+# export FZF_DEFAULT_OPTS=$FZF_DEFAULT_OPTS'
+# --color=fg:#ffffff,bg:#193549,hl:#ffc600
+# --color=fg+:#00aaff,bg+:#185294,hl+:#ffc600
+# --color=info:#9e9e9e,prompt:#ff628c,pointer:#ff9a00
+# --color=marker:#FF628C,spinner:#ffc600,header:#ff628c'
+
+# # tokyonight
+# export FZF_DEFAULT_OPTS=$FZF_DEFAULT_OPTS'
+# --color=fg:#c0caf5,bg:#1a1b26,hl:#61afef
+# --color=fg+:#c0caf5,bg+:#1a1b26,hl+:#61afef
+# --color=info:#c0caf5,prompt:#ff79c6,pointer:#f1fa8c
+# --color=marker:#FF79C6,spinner:#50fa7b,header:#ff79c6'
+
+# # catppuccin
+# export FZF_DEFAULT_OPTS=$FZF_DEFAULT_OPTS" \
+# --color=bg+:#313244,bg:#1e1e2e,spinner:#f5e0dc,hl:#f38ba8 \
+# --color=fg:#cdd6f4,header:#f38ba8,info:#cba6f7,pointer:#f5e0dc \
+# --color=marker:#f5e0dc,fg+:#cdd6f4,prompt:#cba6f7,hl+:#f38ba8"
+
+# # vscode-dark+ theme
+# export FZF_DEFAULT_OPTS=$FZF_DEFAULT_OPTS'
+# --color=fg:#d4d4d4,bg:#1e1e1e,hl:#afd7ff
+# --color=fg+:#d4d4d4,bg+:#007acc,hl+:#afd7ff
+# --color=info:#d4d4d4,prompt:#61dafb,pointer:#50fa7b
+# --color=marker:#f1fa8c,spinner:#bd93f9,header:#bd93f9'
+
+# export FZF_DEFAULT_OPTS=$FZF_DEFAULT_OPTS"
+# 	--color=fg:#908caa,bg:#191724,hl:#ebbcba
+# 	--color=fg+:#e0def4,bg+:#26233a,hl+:#ebbcba
+# 	--color=border:#403d52,header:#31748f,gutter:#191724
+# 	--color=spinner:#f6c177,info:#9ccfd8,separator:#403d52
+# 	--color=pointer:#c4a7e7,marker:#eb6f92,prompt:#908caa"
+
+# # rose-pine
+# export FZF_DEFAULT_OPTS=$FZF_DEFAULT_OPTS'
+# --color=fg:#eceff4,bg:#1e222a,hl:#bd93f9
+# --color=fg+:#eceff4,bg+:#2e3440,hl+:#bd93f9
+# --color=info:#d8dee9,prompt:#ff6e6e,pointer:#bd93f9
+# --color=marker:#f1fa8c,spinner:#bd93f9,header:#bd93f9'
+#
+#
+## Rose-Pine theme for FZF ?
+# export FZF_DEFAULT_OPTS=$FZF_DEFAULT_OPTS"
+#  --color=fg:#e0def4,bg:#1f1d2e,hl:#6e6a86
+#  --color=fg+:#908caa,bg+:#191724,hl+:#908caa
+#  --color=info:#9ccfd8,prompt:#f6c177,pointer:#c4a7e7
+#  --color=marker:#ebbcba,spinner:#eb6f92,header:#ebbcba"
+#
+# +--------------------FZF End Colors-----------------------------+
+#
+# THIS IS FOR THE SPACESHIP THEME OR PROMPT.
+# ZSH_THEME="spaceship"
+#
+#          ╭──────────────────────────────────────────────────────────╮
+#          │                  Personal ALIAS                          │
+#          ╰──────────────────────────────────────────────────────────╯
+#
+# Music through MPD
+alias music='ncmpcpp'
+alias alacritty-music="exec alacritty -T 'Music' -e ncmpcpp"
+#
+# alias pycolors="$BROWSER ~/.local/bin/pywal-colors.html"
+alias pywal-colors="xdg-open ~/.local/bin/pywal-colors.html; echo 'Opening Pywal Colors In Brave ;)'"
+
+#          +----------------------------------------------------------+
+#          |            Wallust & Pywal Scripts and Tools             |
+#          +----------------------------------------------------------+
+#
+alias walltest="wallust -T -C ~/.config/wallust/wallust-conf.toml -k run $@"
+alias walest="wallust run $@"
+#
+#
+# ── List ──────────────────────────────────────────────────────────────
+#          ╭──────────────────────────────────────────────────────────╮
+#          │            eza is the new ls replacment tool             │
+#          ╰──────────────────────────────────────────────────────────╯
+#
+# alias ls='ls --color=always'
+
+#
+# NOTE: Save LSDelux
+# ── LSDelux ───────────────────────────────────────────────────────────
+# -l = long --git -d=dirOnly -L=linkRef -F=classify -1=onePerline 
+# -R=recursiveInTo
+# FIX: Replace lsd with eza
+#
+alias ls='lsd --color=always --icon=always'
+# alias ls='ls --color=auto'
+alias la='lsd --git --color=always --icon=always -a'
+# alias ll='ls -alFh'
+# alias lsa='ls -la'
+# alias l='lsd --git --color=always --icon=always -a'
+alias l.="ls -A | egrep '^\.'"
+# alias l.="lsa -A | egrep'^\.'"
+# alias listdir="ls -d */ > list"
+alias l='lsd -aF -group-directories-first --color=always --icon=always'
+alias ll='lsd -alFh --git --icon=always --color=always --group-directories-first'
+# alias lsd='lsd -aF --color=always --git --icon=always'
+alias lsdir='lsd -laFh --git --group-dirs="first"'
+alias lsa='lsd -al --git --icon=always --color=always'
+# alias ls='eza'
+# alias lsd='eza'
+
+alias reloadz='exec zsh'
+
+# May 20,2024 I added --git-repos to a few of the bellow aliases
+# ── EZA ───────────────────────────────────────────────────────────────
+# eza    Lists the contents of the current directory in a grid.
+#
+# eza --oneline --reverse --sort=size
+#        Displays a list of files with the largest at the top.
+#
+# eza --long --header --inode --git
+#        Displays a table of files with a header, showing each file’s metadata, inode, and Git status.
+#
+# eza --long --tree --level=3
+#        Displays a tree of files, three levels deep, as well as each file’s metadata.
+#
+# I need eza flags here. NOT the same as lsd.
+# --git-repos --git 
+## Long view options bellow
+# -h = header row to each col --header
+# -M --mounts Show mount details
+# 
+# alias eza="eza --colour=always --icons=always -a --color-scale=all --git-repos --git"
+
+# I'd bet this is the problem with eza taking way too long to do simple displaying.
+# alias exa="eza --color=auto --git --git-repos --icons=always -ahm -@ --total-size --color-scale=all"
+
+
+
+# ── EXA ───────────────────────────────────────────────────────────────
+# These work fine - exa has became eza -
+alias xls="exa -a --icons --color=always --group-directories-first --color-scale=all --git --git-repos"
+alias xll="exa -lag --icons --color=always --group-directories-first --octal-permissions --git --color-scale=all --git-repos"
+
+alias llg="eza -lag --icons --color=always --group-directories-first --octal-permissions --git --git-repos --color-scale=all"
+alias xxl="exa -a -m --icons --color=always --group-directories-first --color-scale=all --git --git-repos"
+
+# NerdFont - getnf -k
+alias getnf="getnf -k"
+
+# +----------------------------+ Fastfetch +--------------------------+
+# Lets try this out to find-out what will work and what wont work.
+#
+alias fastf="fastfetch "
+alias flf="flashfetch"
+
+# Glow - Open a terminal and luanch glow in a directory of choice
+# TEST: pwd, cwd, term, colorschemes
+alias glowd='wezterm-gui start -- glow $PWD'
+
+# +-----------------------------+ RedShift +-----------------------------+
+alias redon="redshift -p -O 6500"
+alias redoff="redshift -x"
+
+# alias fm='ranger'
+
+alias run-all-scripts-here="for script in ./*.sh ; do bash $script ; done"
+
+# alias pamac-tray='env GTK_THEME=Arc-Dark /usr/bin/pamac-tray'
+
+alias update-skel='cp -Rf /etc/skel ~/.skel-backup-$(date +%Y.%m.%d-%H.%M.%S) & sudo pacman -Syyu'
+#alias update='cp -Rf /etc/skel ~/.skel-backup-$(date +%Y.%m.%d-%H.%M.%S) & sudo pacman -Syyu'
+
+alias nitroran="nitrogen --random /home/john/Walpapers/Fav_Walls_2024 --set-zoom-fill"
+#
+alias wifi-con="nmtui-connect"
+#
+# ── Editing configs with Nvim ─────────────────────────────────────────
+alias ezshp="$EDITOR ~/.zshrc-personal"
+alias ebashrcp="$EDITOR ~/.bashrc-personal"
+# Adding sudo to nvim for zshrc - sudo isn't needed - It's in your HOME directory
+## - Can I add sudo to my $EDITOR
+alias nzsh="sudo nvim ~/.zshrc"
+alias nzshp="sudo nvim ~/.zshrc-personal"
+
+alias ffprobe="ffprobe -hide_banner"
+#
+# Fix for wifi // This don't work. It needs better permissions //
+# wifi-resetter
+alias fix-wifi='sudo ~/.local/bin/wifi-resetter'
+
+# z Starts the folds keys
+#
+# Go through the config and see what needs changed.
+# ── *** Backing Up My DotFiles To GitLab *** ──────────────────────────
+# The OG is in zshrc
+# This is for my config files
+# ──────────────────────────────────────────────────────────────────────
+alias config='/usr/bin/git --git-dir=$HOME/.cfg --work-tree=$HOME'
+
+# config config --local status.showUntrackedFiles no
+# ──────────────────────────────────────────────────────────────────────
+
+# ── ###########*** My Drives ***##################################### ──
+# NOTE:  May 20, 2024 Try to make an alias to open my other drives.
+# NO work: needs better cd permissions
+alias drive2="sudo; cd /run/media/john/75GB_Reformated"
+#
+# Name = 75GB_Reformated - (/dev/sdb1)
+# /run/media/john/75GB_Reformated/
+#
+# Name = 128 GB Volume - 128GB Memory Card - (/dev/mmcblk0p1)
+# /run/media/john/disk/
+# -- I also have a sd-card reader
+#  - This is a memory card inside the sd-card reader
+#
+
+#          ╭──────────────────────────────────────────────────────────╮
+#          │           Show installed packages from pacman            │
+#          ╰──────────────────────────────────────────────────────────╯
+
+# ── Finding OR Removing packages ──────────────────────────────────────
+alias paccs="pacman -Slq | fzf -m --preview 'cat <(pacman -Si {1}) <(pacman -Fl {1} | awk \"{print \$2}\")' | xargs -ro sudo pacman -S"
+# Paru Install
+alias pars="paru -Slq | fzf -m --preview 'cat <(paru -Si {1}) <(paru -Fl {1} | awk \"{print \$2}\")' | xargs -ro  paru -S"
+# Pacman remove
+alias pacrem="pacman -Qq | fzf --multi --preview 'pacman -Qi {1}' | xargs -ro sudo pacman -Rns"
+alias pacsf="pacman -Q | fzf"
+
+#
+# Only using Paru for now. NO more Yay
+# alias yayI='yay -Slq | fzf -m --preview '\''cat <(yay -Si {1}) <(yay -Fl {1} | awk "{print $2}")'\'' | xargs -ro  yay -S'
+#
+# ERRORS on pacpreview ???
+# ── pacs will show the installed packages with a fzf window ───────────
+alias pacs="sudo pacman -Slq | fzf --multi --preview 'pacpreview {1}' | xargs -ro sudo pacman -S"
+#
+# ── showin will show installed packages in an fzf window ──────────────
+alias showin="sudo pacman -Qq | fzf --preview 'pacman -Qil {}' --layout=reverse --bind 'enter:execute(pacman -Qil {} | less)'"
+#Cleanup orphaned packages
+# alias cleanup='sudo pacman -Rns $(pacman -Qtdq)'
+
+# This will generate a list of explicitly installed packages
+alias list="sudo pacman -Qqe"
+#
+#This will generate a list of explicitly installed packages without dependencies
+alias listt="sudo pacman -Qqet"
+#
+###   list of AUR packages
+alias listaur="sudo pacman -Qqem"
+#
+# add > list at the end to write to a file
+
+# install packages from list
+# pacman -S --needed - < my-list-of-packages.txt
+
+
+# ── Adding my own ─────────────────────────────────────────────────────
+alias esddm="sudo $EDITOR /etc/sddm.conf"
+alias ehost="sudo $EDITOR /etc/hosts"
+alias ensswitch="sudo $EDITOR /etc/nsswitch.conf"
+alias nrefind="sudo $EDITOR /boot/refind_linux.conf"
+# NOT root files so no sudo * Correct
+alias nalacritty="nvim /home/$USER/.config/alacritty/alacritty.toml"
+alias nwezterm="nvim /home/$USER/.config/wezterm/wezterm.lua"
+
+#          ╭──────────────────────────────────────────────────────────╮
+#          │   This is GOLD for finding out what is taking so much    │
+#          │                  space on your drives!                   │
+#          ╰──────────────────────────────────────────────────────────╯
+# diskspaces
+alias diskspaces="du -S | sort -n -r |more"
+# - This can also be done with eza
+# ── Show me the size (sorted) of only the folders in this directory ───
+alias folders="find . -maxdepth 1 -type d -print | xargs du -sk | sort -rn"
+alias folder-size="find . -maxdepth 1 -type d -print | xargs du -sk | sort -rn"
+
+# Show the Swap size
+alias swps="find . -name .\*.sw[op]"
+
+# ── Setting options in ZSH ────────────────────────────────────────────
+setopt COMBINING_CHARS
+
+#          ╭──────────────────────────────────────────────────────────╮
+#          │              *** Environment Variables ***               │
+#          ╰──────────────────────────────────────────────────────────╯
+# ── Add directory to the $PATH Environment Variable ───────────────────────────────
+# ── export the folder to the path enviroment variable ────────────────────────────
+export PATH="$HOME/.config/rofi/scripts:$PATH"
+
+# Weather Conky
+export OPENWEATHER_API_KEY=4e7f59c1420281539d2c7c59282b9b6b
+
+alias conkyweather="$HOME/.conky/Clock-With-Weather-Conky/scripts/start.sh 4e7f59c1420281539d2c7c59282b9b6b"
+#
+#          ╭──────────────────────────────────────────────────────────╮
+#          │         #   *** FZF SCRIPTS AND FILES ***   #            │
+#          ╰──────────────────────────────────────────────────────────╯
+#
+# ── sourc % - Add sources here - I think this works ?  # ──────────────
+# . ~/Scripts/FZF_SCRIPTS/auto-sized-fzf.sh
+# source ~/Scripts/FZF-SCRIPTS/auto-sized-fzf.sh
+#
+#
+# *** fzf-git *** should be in local/bin
+# ── jungunn fzf-git.sh ────────────────────────────────────────────────
+# - function to source the file or folder if its there. ---- Looks Good
+source ~/Scripts/fzf-git/functions.sh
+source ~/Scripts/fzf-git/key-binding.zsh
+#
+#
+# NO NOT THE SAME. I think source and . might be the same ?
+# I think that this script should get sourced inside the new fzf script at the top.- Write a new script and call this inside.
+. ~/.local/bin/auto-sized-fzf.sh
+source ~/.local/bin/auto-sized-fzf.sh
+
+# +----------+ Use my Scripts folder - Use local/bin instead +--------+
+#
+# - I'd bet these are ON by default / So only source them when I change them OR move to a new location -
+# source /usr/share/fzf/key-bindings.zsh
+
+#          ╭──────────────────────────────────────────────────────────╮
+#          │                          Fzpac                           │
+#          ╰──────────────────────────────────────────────────────────╯
+# fzpac variable export - fuzzy find packages with yay, paru, pacman - I might need the path to the package
+export FZPAC_PACMAN="paru:pacman"
+
+# ── Yarn ──────────────────────────────────────────────────────────────
+export PATH="$HOME/.yarn/bin:$HOME/.config/yarn/global/node_modules/.bin:$PATH"
+
+# Removed March 23, 2024
+#Getting Tilix working better
+# if [ $TILIX_ID ] || [ $VTE_VERSION ]; then
+#         source /etc/profile.d/vte.sh
+# fi
+
+# ── Node version manager ──────────────────────────────────────────────
+export NVM_DIR="$([ -z "${XDG_CONFIG_HOME-}" ] && printf %s "${HOME}/.nvm" || printf %s "${XDG_CONFIG_HOME}/nvm")"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+#
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
+
+# ── My backup configs alias ───────────────────────────────────────────
+alias config='/usr/bin/git --git-dir=/home/john/.cfg/ --work-tree=/home/john'
+
+source /usr/share/zsh-theme-powerlevel10k/powerlevel10k.zsh-theme
+
+source ~/.config/ranger/plugins/shell_subshell_notice.sh
+# ── Show Ranger in prompt ─────────────────────────────────────────────
+if [ -n "$RANGER_LEVEL" ]; then export PS1="[ranger]$PS1"; fi
+
+
+# ── Found this in a rando place inside of zshrc.In the middle of the ──
+# config.
+if [ -f $ZSH/oh-my-zsh.sh ]; then
+  source $ZSH/oh-my-zsh.sh
+fi
+
+fpath=(~/.zsh.d/ $fpath)
+
+
+# ── eza ───────────────────────────────────────────────────────────────
+# echo 'export FPATH="<~/Projects/eza/completions/zsh/_eza>/completions/zsh:$FPATH"' >> ~/.zshrc
+export FPATH="<~/Projects/eza/completions/zsh/_eza>/completions/zsh:$FPATH"
+# ── Android Studio ────────────────────────────────────────────────────
+export PATH=/opt/android-studio/bin/:$PATH
+# ── pnpm ──────────────────────────────────────────────────────────────
+export PNPM_HOME="/home/john/.local/share/pnpm"
+export PATH="$PNPM_HOME:$PATH"
+# ── pnpm end ──────────────────────────────────────────────────────────
+# ── Yarn ──────────────────────────────────────────────────────────────
+export PATH="$HOME/.yarn/bin:$HOME/.config/yarn/global/node_modules/.bin:$PATH"
+#
+#          ╭──────────────────────────────────────────────────────────╮
+#          │                      PyWal Settings                      │
+#          ╰──────────────────────────────────────────────────────────╯
+# Import colorscheme from 'wal' asynchonously.
+# &   # Run in the background.
+# ( ) # Hide shell job control messages.
+# More can be done to get the theme and wal started
+# OR ran automatically 
+
+###PyWal
+ # (cat ~/.cache/wal/sequences &)
+
+# ── Alternative ( blocks terminal for 0-3ms ) ─────────────────────────
+ # cat ~/.cache/wal/sequences
+
+# ── To add support for TTYs this line can be optionally added. ────────
+ # source ~/.cache/wal/colors-tty.sh
+##PyWal
+
+### Using wallust now
+ # Wallust
+# cat ~/.cache/wallust/sequences &
+# (cat ~/.cache/wallust/sequences &)
+#
+# source ~/.cache/wallust/colors_tty.sh
+
